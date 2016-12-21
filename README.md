@@ -1,5 +1,8 @@
 # Demos
 Code for demos and tests.
 
-PCL: PCL examples.
-Version 1.8.
+# PCL folder
+Examples for PCL version 1.8.
+
+# OpenNi folder
+Examples for OpenNi version 2.
