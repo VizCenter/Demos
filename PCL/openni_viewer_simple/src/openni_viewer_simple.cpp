@@ -52,8 +52,11 @@
 #include <vector>
 #include <string>
 
+#include <pcl/io/openni2/openni.h>
 #include <pcl/io/openni_camera/openni_image.h>
 #include <pcl/io/openni2/openni2_device.h>
+#include <pcl/io/openni2/openni2_device_manager.h>
+#include <pcl/io/openni2/openni2_device_info.h>
 
 using namespace std;
 
@@ -166,6 +169,7 @@ class SimpleOpenNIViewer
         void run ()
         {
             //pcl::Grabber* interface = new pcl::OpenNIGrabber(device_id_, pcl::OpenNIGrabber::OpenNI_QQVGA_30Hz, pcl::OpenNIGrabber::OpenNI_VGA_30Hz);
+            cout << "SimpleOpenNIViewer: Starting run..." << endl;
             
             string mouseMsg3D("Mouse coordinates in PCL Visualizer");
             string keyMsg3D("Key event for PCL Visualizer");
@@ -188,6 +192,10 @@ class SimpleOpenNIViewer
             unsigned char* rgb_data = 0;
             unsigned rgb_data_size = 0;
             #endif        
+            
+            boost::shared_ptr<pcl::io::openni2::OpenNI2Device> device = grabber_.getDevice();
+            cout << "Device Name: " << device->getName() << " Vendor: " << device->getVendor() << " Uri: " << device->getUri() << " String ID: " << device->getStringID() << endl;
+            
             
             grabber_.start ();
             
@@ -300,6 +308,36 @@ int main(int argc, char ** argv)
             {
                 pcl::io::OpenNI2Grabber grabber(argv[2]);
                 boost::shared_ptr<pcl::io::openni2::OpenNI2Device> device = grabber.getDevice();
+                
+                // Test                                 
+                cout << "Device Name: " << device->getName() << " Vendor: " << device->getVendor() << " Uri: " << device->getUri() << " String ID: " << device->getStringID() << " USB Product ID: " <<  device->getUsbProductId() << " USB Vendor Id: " << device->getUsbVendorId() << endl;
+                
+                // TODO: Add this block to PCL code and compile again!
+                pcl::io::openni2::OpenNI2DeviceManager deviceManager;
+                device_id = argv[2];
+                boost::shared_ptr<pcl::io::openni2::OpenNI2Device> device_;
+                
+                if (device_id[0] == '#')
+                {
+                    unsigned index = atoi (device_id.c_str () + 1);
+                    index--;
+                    cout << "Device index: " << index << endl;
+                    
+                    boost::shared_ptr<std::vector<std::string> > uris = deviceManager.getConnectedDeviceURIs ();
+                    cout << "Urist at: " << index << ": " << uris->at(index) << endl;
+                    
+                    
+                    device_ = deviceManager.getDeviceByIndex (index);
+                }
+                else
+                {
+                    device_ = deviceManager.getDevice(device_id);
+                }
+                
+                
+                cout << "device_: " << device_->getUri() << endl;                
+                // End Test 
+                
                 cout << "Supported depth modes for device: " << device->getVendor() << " , " << device->getUsbProductId() << endl;
                 
                 std::vector<std::pair<int, pcl::io::openni2::OpenNI2VideoMode> > modes = grabber.getAvailableDepthModes();
@@ -323,20 +361,25 @@ int main(int argc, char ** argv)
             }
             else
             {
-                openni_wrapper::OpenNIDriver& driver = openni_wrapper::OpenNIDriver::getInstance();
-                if (driver.getNumberDevices() > 0)
+                pcl::io::openni2::OpenNI2DeviceManager deviceManager;
+                
+                if (deviceManager.getNumOfConnectedDevices() > 0)
                 {
-                    for (unsigned deviceIdx = 0; deviceIdx < driver.getNumberDevices(); ++deviceIdx)
-                    {
-                        cout << "Device: " << deviceIdx + 1 << ", vendor: " << driver.getVendorName(deviceIdx) << ", product: " << driver.getProductName(deviceIdx)
-                        << ", connected: " << (int) driver.getBus(deviceIdx) << " @ " << (int) driver.getAddress(deviceIdx) << ", serial number: \'" << driver.getSerialNumber(deviceIdx) << "\'" << endl;
-                    }
+                    cout << "Connected devices: " << deviceManager.getNumOfConnectedDevices() << endl;
                     
+                    boost::shared_ptr<std::vector<pcl::io::openni2::OpenNI2DeviceInfo> > devices = deviceManager.getConnectedDeviceInfos ();                    
+                    int index = 1;
+                    for (std::vector<pcl::io::openni2::OpenNI2DeviceInfo>::const_iterator i = devices->begin(); i != devices->end(); i++)
+                    {
+                        cout << "Index: " << index << " Uri: " << i->uri_ << " Vendor: " << i->vendor_ << " Name: " << i->name_ << " Vendor Id: " << i->vendor_id_ << " Product id: " << i->product_id_ << endl;
+                        
+                        index++;
+                    }
                 }
                 else
+                {
                     cout << "No devices connected." << endl;
-                
-                cout <<"Virtual Devices available: ONI player" << endl;
+                }
             }
             return 0;
         }
@@ -346,6 +389,8 @@ int main(int argc, char ** argv)
         openni_wrapper::OpenNIDriver& driver = openni_wrapper::OpenNIDriver::getInstance();
         if (driver.getNumberDevices() > 0)
             cout << "Device Id not set, using first device." << endl;
+        else
+            cout << "Devices found by driver: " << driver.getNumberDevices() << endl;
     }
     
     unsigned mode;
