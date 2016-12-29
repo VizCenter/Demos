@@ -40,7 +40,7 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/common/time.h> //fps calculations
-#include <pcl/io/openni_grabber.h>
+#include <pcl/io/openni2_grabber.h>
 #include <pcl/visualization/cloud_viewer.h>
 #include <pcl/visualization/image_viewer.h>
 #include <pcl/io/openni_camera/openni_driver.h>
@@ -51,6 +51,9 @@
 #include <vtkImageImport.h>
 #include <vector>
 #include <string>
+
+#include <pcl/io/openni_camera/openni_image.h>
+#include <pcl/io/openni2/openni2_device.h>
 
 using namespace std;
 
@@ -85,7 +88,7 @@ class SimpleOpenNIViewer
     typedef pcl::PointCloud<PointType> Cloud;
     typedef typename Cloud::ConstPtr CloudConstPtr;
 
-    SimpleOpenNIViewer (pcl::OpenNIGrabber& grabber)
+    SimpleOpenNIViewer (pcl::io::OpenNI2Grabber& grabber)
       : cloud_viewer_ ("PCL OpenNI Viewer")
       , grabber_ (grabber)
 #if !((VTK_MAJOR_VERSION == 5)&&(VTK_MINOR_VERSION <= 4))
@@ -235,7 +238,7 @@ class SimpleOpenNIViewer
     }
 
     pcl::visualization::CloudViewer cloud_viewer_;
-    pcl::OpenNIGrabber& grabber_;
+    pcl::io::OpenNI2Grabber& grabber_;
     boost::mutex cloud_mutex_;
     CloudConstPtr cloud_;
     
@@ -284,8 +287,8 @@ int
 main(int argc, char ** argv)
 {
   std::string device_id("");
-  pcl::OpenNIGrabber::Mode depth_mode = pcl::OpenNIGrabber::OpenNI_Default_Mode;
-  pcl::OpenNIGrabber::Mode image_mode = pcl::OpenNIGrabber::OpenNI_Default_Mode;
+  pcl::io::OpenNI2Grabber::Mode depth_mode = pcl::io::OpenNI2Grabber::OpenNI_Default_Mode;
+  pcl::io::OpenNI2Grabber::Mode image_mode = pcl::io::OpenNI2Grabber::OpenNI_Default_Mode;
   bool xyz = false;
   
   if (argc >= 2)
@@ -300,22 +303,26 @@ main(int argc, char ** argv)
     {
       if (argc >= 3)
       {
-        pcl::OpenNIGrabber grabber(argv[2]);
-        boost::shared_ptr<openni_wrapper::OpenNIDevice> device = grabber.getDevice();
-        cout << "Supported depth modes for device: " << device->getVendorName() << " , " << device->getProductName() << endl;
-        std::vector<std::pair<int, XnMapOutputMode > > modes = grabber.getAvailableDepthModes();
-        for (std::vector<std::pair<int, XnMapOutputMode > >::const_iterator it = modes.begin(); it != modes.end(); ++it)
+        pcl::io::OpenNI2Grabber grabber(argv[2]);
+        boost::shared_ptr<pcl::io::openni2::OpenNI2Device> device = grabber.getDevice();
+        cout << "Supported depth modes for device: " << device->getVendor() << " , " << device->getUsbProductId() << endl;
+        
+        std::vector<std::pair<int, pcl::io::openni2::OpenNI2VideoMode> > modes = grabber.getAvailableDepthModes();
+        
+        for (std::vector<std::pair<int, pcl::io::openni2::OpenNI2VideoMode > >::const_iterator it = modes.begin(); it != modes.end(); ++it)
         {
-          cout << it->first << " = " << it->second.nXRes << " x " << it->second.nYRes << " @ " << it->second.nFPS << endl;
+          cout << it->first << " = " << it->second.x_resolution_ << " x " << it->second.y_resolution_ << " @ " << it->second.frame_rate_ << endl;
         }
 
-        if (device->hasImageStream ())
+        
+        if (device->hasColorSensor ())
         {
-          cout << endl << "Supported image modes for device: " << device->getVendorName() << " , " << device->getProductName() << endl;
+          cout << endl << "Supported image modes for device: " << device->getVendor() << " , " << device->getUsbProductId() << endl;
           modes = grabber.getAvailableImageModes();
-          for (std::vector<std::pair<int, XnMapOutputMode > >::const_iterator it = modes.begin(); it != modes.end(); ++it)
+          
+          for (std::vector<std::pair<int, pcl::io::openni2::OpenNI2VideoMode > >::const_iterator it = modes.begin(); it != modes.end(); ++it)
           {
-            cout << it->first << " = " << it->second.nXRes << " x " << it->second.nYRes << " @ " << it->second.nFPS << endl;
+            cout << it->first << " = " << it->second.x_resolution_ << " x " << it->second.y_resolution_ << " @ " << it->second.frame_rate_ << endl;
           }
         }
       }
@@ -348,22 +355,22 @@ main(int argc, char ** argv)
   
   unsigned mode;
   if (pcl::console::parse(argc, argv, "-depthmode", mode) != -1)
-    depth_mode = (pcl::OpenNIGrabber::Mode) mode;
+    depth_mode = (pcl::io::OpenNI2Grabber::Mode) mode;
 
   if (pcl::console::parse(argc, argv, "-imagemode", mode) != -1)
-    image_mode = (pcl::OpenNIGrabber::Mode) mode;
+    image_mode = (pcl::io::OpenNI2Grabber::Mode) mode;
   
   if (pcl::console::find_argument(argc, argv, "-xyz") != -1)
     xyz = true;
   
-  pcl::OpenNIGrabber grabber (device_id, depth_mode, image_mode);
+  pcl::io::OpenNI2Grabber grabber (device_id, depth_mode, image_mode);
   
   if (xyz) // only if xyz flag is set, since grabber provides at least XYZ and XYZI pointclouds
   {
     SimpleOpenNIViewer<pcl::PointXYZ> v (grabber);
     v.run ();
   }
-  else if (grabber.providesCallback<pcl::OpenNIGrabber::sig_cb_openni_point_cloud_rgb> ())
+  else if (grabber.providesCallback<pcl::io::OpenNI2Grabber::sig_cb_openni_point_cloud_rgb> ())
   {
     SimpleOpenNIViewer<pcl::PointXYZRGBA> v (grabber);
     v.run ();
